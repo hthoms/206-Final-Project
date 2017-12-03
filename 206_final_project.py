@@ -96,3 +96,15 @@ conn.commit()
 
 
 
+
+
+#DarkSky API
+
+
+
+#Google Maps API
+
+
+
+#Gmail API
+
