@@ -108,3 +108,6 @@ conn.commit()
 
 #Gmail API
 
+
+cur.close()
+conn.close()
