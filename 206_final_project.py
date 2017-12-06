@@ -53,12 +53,12 @@ def get_event_info(query):
 
 graph = facebook.GraphAPI(fb_access_token)
 #search facebook for concerts
-events = get_event_info('/search?q=concert&type=event&limit=200')
+events = get_event_info('/search?q=concert&type=event&limit=20')
 
 conn = sqlite3.connect('206_Final_project.sqlite')
 cur = conn.cursor()
 cur.execute('DROP TABLE IF EXISTS Event_Places')
-cur.execute('CREATE TABLE Event_Places(place_id STRING PRIMARY KEY UNIQUE NOT NULL, city STRING, country STRING, latitude FLOAT, longitude FLOAT, temperature FLOAT, weather STRING)')
+cur.execute('CREATE TABLE Event_Places(place_id STRING PRIMARY KEY UNIQUE NOT NULL, address STRING, city STRING, country STRING, latitude FLOAT, longitude FLOAT, temperature FLOAT, weather STRING)')
 cur.execute('DROP TABLE IF EXISTS Events')
 cur.execute('CREATE TABLE Events(event_id STRING PRIMARY KEY UNIQUE NOT NULL, event_name STRING, place_id STRING, start_time STRING, day_of_week INTEGER, num_attending INTEGER, num_interested INTEGER, FOREIGN KEY(place_id) REFERENCES Event_Places(place_id))')
 
@@ -83,8 +83,8 @@ for event in events:
 	event_info = graph.get_object(id=events[count]['id'], fields='name, place, start_time, attending_count, interested_count')
 	#facebook date format (2017-12-09T18:00:00+0700) to day of week where monday = 0 and sunday = 6
 	if 'place' in event_info:
-		place_tup = (return_info2('place', 'id', event_info), return_info2('location', 'city', event_info['place']), return_info2('location', 'country', event_info['place']), return_info2('location', 'latitude', event_info['place']), return_info2('location', 'longitude', event_info['place']), None, None)
-		cur.execute('INSERT OR IGNORE INTO Event_Places(place_id, city, country, latitude, longitude, temperature, weather) VALUES(?,?,?,?,?,?,?)', place_tup)
+		place_tup = (return_info2('place', 'id', event_info), None, return_info2('location', 'city', event_info['place']), return_info2('location', 'country', event_info['place']), return_info2('location', 'latitude', event_info['place']), return_info2('location', 'longitude', event_info['place']), None, None)
+		cur.execute('INSERT OR IGNORE INTO Event_Places(place_id, address, city, country, latitude, longitude, temperature, weather) VALUES(?,?,?,?,?,?,?,?)', place_tup)
 	if 'start_time' in event_info:
 		timestamp = event_info['start_time']
 		ymd = re.match('^.{10}', timestamp).group(0).split('-')
@@ -158,7 +158,7 @@ ply.iplot(fbavgfigure, filename='Attending and Interested in Events')
 #DarkSky API
 
 #api setup
-base_url = 'https://api.darksky.net/forecast/' + api_info.darksky_secret_key
+dsbase_url = 'https://api.darksky.net/forecast/' + api_info.darksky_secret_key
 
 #get id, latitude, longitude from database, store in list of tuples
 cur.execute('SELECT place_id, latitude, longitude FROM Event_Places')
@@ -173,7 +173,7 @@ def get_location_info(latlong):
 	#adds lat/long to cache file if not there already
 	else:
 		#retrieves darksky data for only the current weather at the lat/long
-		response = requests.get(base_url + '/' + latlong + '?exclude=minutely,hourly,daily,alerts,flags')
+		response = requests.get(dsbase_url + '/' + latlong + '?exclude=minutely,hourly,daily,alerts,flags')
 		location_info = json.loads(response.text)
 		#saves event data for lat/long in dictionary
 		CACHE_DICTION[latlong] = location_info
@@ -201,11 +201,49 @@ conn.commit()
 
 #Google Maps API
 
+#get address for latlong with Google Maps geocoding
+#format: https://maps.googleapis.com/maps/api/geocode/json?latlng=40.714224,-73.961452&key='
+base_geocoding_url= 'https://maps.googleapis.com/maps/api/geocode/json?latlng='
 
+def get_address(latlong):
+	#creating variable because latlong is already a key for darksky info
+	googlegeo_key = 'address'+latlong
+	#first checks to see if lat/long info is already in the cache file
+	if (googlegeo_key) in CACHE_DICTION:
+		#stores data from dictionary for lat/long in list object
+		address = CACHE_DICTION[googlegeo_key]
+	#adds lat/long to cache file if not there already
+	else:
+		#retrieves darksky data for only the current weather at the lat/long
+		response = requests.get(base_geocoding_url + latlong + '&key=' + api_info.googlemaps_key)
+		address = json.loads(response.text)
+		#saves event data for lat/long in dictionary
+		CACHE_DICTION[googlegeo_key] = address
+		#opens cache file to write to it
+		cachefile = open(CACHE_FNAME, "w")
+		#writes data in the dictionary to the cache file
+		cachefile.write(json.dumps(CACHE_DICTION))
+		#closes cache file after writing
+		cachefile.close()
+	#should return list of data retrieved from the cache or pulled from facebook
+	return address
+
+for place in locationlist:
+	latlong = str(place[1]) + ',' + str(place[2])
+	addressinfo = get_address(latlong)
+	address = addressinfo['results'][0]['formatted_address']
+	cur.execute('UPDATE Event_Places SET address = ? WHERE place_id = ?', (address, place[0]))
+conn.commit()
+
+
+#map with static maps
+
+#gmaps_base_url = 'https://maps.googleapis.com/maps/api/staticmap?'
+#api_info.googlemaps_key
 
 #Gmail API
 
-
+#have you fixed the number of events facebook returns? make it 200
 cur.close()
 conn.close()
 
