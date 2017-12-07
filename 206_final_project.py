@@ -14,7 +14,8 @@ import api_info
 import requests
 import re
 from datetime import *
-
+from PIL import Image
+from io import BytesIO
 
 #caching setup
 CACHE_FNAME = "206_Final_Project_cache.json"
@@ -53,7 +54,7 @@ def get_event_info(query):
 
 graph = facebook.GraphAPI(fb_access_token)
 #search facebook for concerts
-events = get_event_info('/search?q=concert&type=event&limit=20')
+events = get_event_info('/search?q=concert&type=event&limit=200')
 
 conn = sqlite3.connect('206_Final_project.sqlite')
 cur = conn.cursor()
@@ -215,7 +216,7 @@ def get_address(latlong):
 	#adds lat/long to cache file if not there already
 	else:
 		#retrieves darksky data for only the current weather at the lat/long
-		response = requests.get(base_geocoding_url + latlong + '&key=' + api_info.googlemaps_key)
+		response = requests.get(base_geocoding_url + latlong + '&key=' + api_info.geocode_key)
 		address = json.loads(response.text)
 		#saves event data for lat/long in dictionary
 		CACHE_DICTION[googlegeo_key] = address
@@ -238,12 +239,37 @@ conn.commit()
 
 #map with static maps
 
-#gmaps_base_url = 'https://maps.googleapis.com/maps/api/staticmap?'
-#api_info.googlemaps_key
+staticmap_base_url = 'https://maps.googleapis.com/maps/api/staticmap?center=0,0&size=550x350&&scale=4&maptype=satellite&markers='
+
+cur.execute('SELECT latitude, longitude FROM Event_Places')
+latlonglist = cur.fetchall()
+print(latlonglist)
+for marker in latlonglist:
+	staticmap_base_url = staticmap_base_url + str(marker[0]) + ',' + str(marker[1]) + '|'
+print(staticmap_base_url)
+response = requests.get(staticmap_base_url + '&key=' + api_info.staticmap_key)
+
+i = Image.open(BytesIO(response.content))
+imgfile = "Events_Map.png"
+i.save(imgfile)
+
 
 #Gmail API
 
 #have you fixed the number of events facebook returns? make it 200
 cur.close()
 conn.close()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
