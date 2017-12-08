@@ -115,12 +115,11 @@ daylabels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
 
 #plotly setup
 
-'''
 fbsumdata = [go.Bar(x=daylabels, y= sumdays, text = sumdays, textposition = 'auto', marker=dict(color='rgb(109, 132, 180)',line=dict(color='rgb(0,0,0)',width=1.5)))]
 fbsumlayout=go.Layout(title="Number of Facebook Events Per Day of the Week", xaxis={'title':'Days of the Week'}, yaxis={'title':'Number of Events'})
 fbsumfigure=go.Figure(data=fbsumdata,layout=fbsumlayout)
 ply.iplot(fbsumfigure, filename='Facebook Events per day of the week')
-'''
+
 
 
 
@@ -149,7 +148,7 @@ for i in range(0,7):
 	attendingavg[i] = attendingsum[i] / sumdays[i]
 
 #plotly set up
-'''
+
 fbinterested = go.Bar(x=daylabels, y=interestedavg, name= 'Interested', textposition='auto',marker=dict(color='rgb(255,215,0)',line=dict(color='rgb(0,0,0)',width=1.5)))
 fbattending = go.Bar(x=daylabels, y=attendingavg, name = 'Attending', textposition='auto',marker=dict(color='rgb(205,92,92)',line=dict(color='rgb(0,0,0)',width=1.5)))
 fbavglayout=go.Layout(title="Average Number Attending vs Interested in Event Per Day of the Week", xaxis={'title':'Days of the Week'}, yaxis={'title':'Average Number'})
@@ -157,7 +156,7 @@ fbavglayout=go.Layout(title="Average Number Attending vs Interested in Event Per
 fbavg= [fbinterested, fbattending]
 fbavgfigure = go.Figure(data=fbavg, layout=fbavglayout)
 ply.iplot(fbavgfigure, filename='Attending and Interested in Events')
-'''
+
 
 
 
