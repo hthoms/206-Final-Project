@@ -16,6 +16,7 @@ import re
 from datetime import *
 from PIL import Image
 from io import BytesIO
+import time
 
 #caching setup
 CACHE_FNAME = "206_Final_Project_cache.json"
@@ -113,10 +114,15 @@ for day in dayslist:
 daylabels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 #plotly setup
+
+'''
 fbsumdata = [go.Bar(x=daylabels, y= sumdays, text = sumdays, textposition = 'auto', marker=dict(color='rgb(109, 132, 180)',line=dict(color='rgb(0,0,0)',width=1.5)))]
 fbsumlayout=go.Layout(title="Number of Facebook Events Per Day of the Week", xaxis={'title':'Days of the Week'}, yaxis={'title':'Number of Events'})
 fbsumfigure=go.Figure(data=fbsumdata,layout=fbsumlayout)
 ply.iplot(fbsumfigure, filename='Facebook Events per day of the week')
+'''
+
+
 
 #visualization 2 with plotly
 #average interested vs attending for events on each day of the week
@@ -143,6 +149,7 @@ for i in range(0,7):
 	attendingavg[i] = attendingsum[i] / sumdays[i]
 
 #plotly set up
+'''
 fbinterested = go.Bar(x=daylabels, y=interestedavg, name= 'Interested', textposition='auto',marker=dict(color='rgb(255,215,0)',line=dict(color='rgb(0,0,0)',width=1.5)))
 fbattending = go.Bar(x=daylabels, y=attendingavg, name = 'Attending', textposition='auto',marker=dict(color='rgb(205,92,92)',line=dict(color='rgb(0,0,0)',width=1.5)))
 fbavglayout=go.Layout(title="Average Number Attending vs Interested in Event Per Day of the Week", xaxis={'title':'Days of the Week'}, yaxis={'title':'Average Number'})
@@ -150,7 +157,7 @@ fbavglayout=go.Layout(title="Average Number Attending vs Interested in Event Per
 fbavg= [fbinterested, fbattending]
 fbavgfigure = go.Figure(data=fbavg, layout=fbavglayout)
 ply.iplot(fbavgfigure, filename='Attending and Interested in Events')
-
+'''
 
 
 
@@ -237,24 +244,76 @@ for place in locationlist:
 conn.commit()
 
 
-#map with static maps
+#Visualization: Map of Event Locations using Google Static Map API
+
 
 staticmap_base_url = 'https://maps.googleapis.com/maps/api/staticmap?center=0,0&size=550x350&&scale=4&maptype=satellite&markers='
-
 cur.execute('SELECT latitude, longitude FROM Event_Places')
 latlonglist = cur.fetchall()
-print(latlonglist)
 for marker in latlonglist:
 	staticmap_base_url = staticmap_base_url + str(marker[0]) + ',' + str(marker[1]) + '|'
-print(staticmap_base_url)
 response = requests.get(staticmap_base_url + '&key=' + api_info.staticmap_key)
-
 i = Image.open(BytesIO(response.content))
 imgfile = "Events_Map.png"
 i.save(imgfile)
 
 
-#Gmail API
+
+
+#New York Times API
+#nyt_api = articleAPI(api_info.nytimes_key)
+#articles = nyt_api.search(q = 'Obama', begin_date = '20150101', end_date = '20170101')
+#print(articles)
+def get_article_info(query):
+	#first checks to see if query is already in the cache file
+	if query in CACHE_DICTION:
+		#stores data from dictionary for query in list object
+		article_info = CACHE_DICTION[query]
+	#adds query to cache file if not there already
+	else:
+		#retrieves facebook data for the query
+		response = requests.get(query)
+		article_info = json.loads(response.text)
+		#saves event data for query in dictionary
+		CACHE_DICTION[query] = article_info
+		#opens cache file to write to it
+		cachefile = open(CACHE_FNAME, "w")
+		#writes data in the dictionary to the cache file
+		cachefile.write(json.dumps(CACHE_DICTION))
+		#closes cache file after writing
+		cachefile.close()
+		#should return list of data retrieved from the cache or pulled from facebook
+	return article_info['response']['docs']
+
+
+
+#search for "Earth Day" from 1/1/1970-1/1/1972
+base_nyt_url = ('http://api.nytimes.com/svc/search/v2/articlesearch.json?q=earth+day&begin_date=19700422&end_date=19720101&sort=oldest&')
+#setup database
+cur.execute('DROP TABLE IF EXISTS Articles')
+cur.execute('CREATE TABLE Articles(url STRING, headline STRING, date STRING, word_count INTEGER)')
+
+
+for i in range(1,11):
+	article_info = get_article_info(base_nyt_url + 'page=' + str(i) + '&api-key=' + api_info.nytimes_key)
+
+	#write to database
+	for article in article_info:
+		info_tup = (article['web_url'], article['headline']['main'], article['pub_date'], article['word_count']) 
+		cur.execute('INSERT INTO Articles(url, headline, date, word_count) VALUES (?,?,?,?)', info_tup)
+	#to avoid reaching api rate limit
+	time.sleep(6)
+conn.commit()
+
+
+
+
+
+#nytresponse = requests.get('http://api.nytimes.com/svc/search/v2/articlesearch.json?q=earth+day&begin_date=19700101&page=2&end_date=19720101&sort=oldest&api-key=' + api_info.nytimes_key)
+#print(nytresponse)
+#nytimesarticles = json.loads(nytresponse.text)
+#print(nytimesarticles)
+
 
 #have you fixed the number of events facebook returns? make it 200
 cur.close()
